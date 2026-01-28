@@ -1,6 +1,6 @@
 flowchart LR
-  user((User)) -->|HTTP 5446| gw[Gateway]
-  gw -->|TCP 5446| sb[Sandbox ttyd]
+  user((User)) -->|HTTP 443| gw[Gateway]
+  gw -->|TCP 443| sb[Sandbox ttyd]
   sb -->|AWS API| ls[LocalStack]
 
   subgraph Host
