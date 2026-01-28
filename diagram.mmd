@@ -7,10 +7,10 @@ flowchart LR
     gw
   end
 
-  subgraph Sandbox_Net[Internal Network]
+  subgraph Sandbox_Net["Internal Network"]
     sb
     ls
-    subgraph Tooling[Sandbox Tooling]
+    subgraph Tooling["Sandbox Tooling"]
       tf[Terraform]
       pul["Pulumi - Python"]
       ans[Ansible]
@@ -23,7 +23,7 @@ flowchart LR
   ans --> ls
   awscli --> ls
 
-  subgraph HA_Resources[HA Reference Resources (per region)]
+  subgraph HA_Resources["HA Reference Resources - per region"]
     vpc[VPC]
     pub[Public Subnets]
     priv[Private Subnets]
