@@ -12,7 +12,7 @@ flowchart LR
     ls
     subgraph Tooling[Sandbox Tooling]
       tf[Terraform]
-      pul[Pulumi (Python)]
+      pul["Pulumi - Python"]
       ans[Ansible]
       awscli[AWS CLI]
     end
@@ -31,9 +31,9 @@ flowchart LR
     nat[NAT Gateways]
     alb[ALB]
     asg[Auto Scaling Group]
-    rds[RDS (Multi-AZ)]
-    r53[Route 53 Private DNS]
-    s3[S3 (SSE + Block Public)]
+    rds["RDS - Multi-AZ"]
+    r53["Route 53 Private DNS"]
+    s3["S3 - SSE + Block Public"]
   end
 
   ls --> HA_Resources
