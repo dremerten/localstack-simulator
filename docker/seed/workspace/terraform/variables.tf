@@ -92,17 +92,23 @@ variable "db_password" {
 variable "asg_min_size" {
   type        = number
   description = "Auto Scaling Group minimum size"
-  default     = 2
+  default     = 3
 }
 
 variable "asg_max_size" {
   type        = number
   description = "Auto Scaling Group maximum size"
-  default     = 4
+  default     = 6
 }
 
 variable "asg_desired_capacity" {
   type        = number
   description = "Auto Scaling Group desired capacity"
-  default     = 2
+  default     = 3
+}
+
+variable "alb_count" {
+  type        = number
+  description = "Number of ALBs per region"
+  default     = 3
 }

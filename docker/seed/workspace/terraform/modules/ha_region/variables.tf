@@ -40,6 +40,12 @@ variable "azs" {
   default     = []
 }
 
+variable "alb_count" {
+  type        = number
+  description = "Number of ALBs per region"
+  default     = 3
+}
+
 variable "app_instance_type" {
   type        = string
   description = "EC2 instance type for app servers"

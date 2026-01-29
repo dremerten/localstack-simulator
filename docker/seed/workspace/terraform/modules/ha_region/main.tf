@@ -8,7 +8,7 @@ terraform {
 
 locals {
   enable_full = !var.simulate_unsupported && var.localstack_pro
-  azs         = length(var.azs) > 0 ? var.azs : ["${var.region}a", "${var.region}b"]
+  azs         = length(var.azs) > 0 ? var.azs : ["${var.region}a", "${var.region}b", "${var.region}c"]
   name        = "${var.name_prefix}-${var.component}"
   tags = merge(var.tags, {
     component = var.component
@@ -16,8 +16,8 @@ locals {
     env       = var.environment
   })
   bucket_name = substr(join("-", regexall("[a-z0-9-]+", lower("${local.name}-app"))), 0, 63)
-  alb_name    = substr(join("-", regexall("[a-z0-9-]+", lower("${local.name}-alb"))), 0, 32)
-  tg_name     = substr(join("-", regexall("[a-z0-9-]+", lower("${local.name}-tg"))), 0, 32)
+  alb_name_prefix = substr(join("-", regexall("[a-z0-9-]+", lower("${local.name}-alb"))), 0, 30)
+  tg_name_prefix  = substr(join("-", regexall("[a-z0-9-]+", lower("${local.name}-tg"))), 0, 30)
   user_data   = "#!/bin/bash\necho 'Hello from LocalStack' > /var/www/html/index.html\n"
 }
 
@@ -38,7 +38,7 @@ resource "aws_internet_gateway" "this" {
 }
 
 resource "aws_subnet" "public" {
-  count                   = 2
+  count                   = length(local.azs)
   vpc_id                  = aws_vpc.this.id
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
   availability_zone       = local.azs[count.index]
@@ -50,7 +50,7 @@ resource "aws_subnet" "public" {
 }
 
 resource "aws_subnet" "private" {
-  count             = 2
+  count             = length(local.azs)
   vpc_id            = aws_vpc.this.id
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 10)
   availability_zone = local.azs[count.index]
@@ -270,8 +270,8 @@ resource "aws_security_group" "db" {
 }
 
 resource "aws_lb" "app" {
-  count               = local.enable_full ? 1 : 0
-  name                = local.alb_name
+  count               = local.enable_full ? var.alb_count : 0
+  name                = format("%s-%d", local.alb_name_prefix, count.index + 1)
   load_balancer_type  = "application"
   internal            = false
   security_groups     = [aws_security_group.alb.id]
@@ -281,8 +281,8 @@ resource "aws_lb" "app" {
 }
 
 resource "aws_lb_target_group" "app" {
-  count     = local.enable_full ? 1 : 0
-  name      = local.tg_name
+  count     = local.enable_full ? var.alb_count : 0
+  name      = format("%s-%d", local.tg_name_prefix, count.index + 1)
   port      = 80
   protocol  = "HTTP"
   target_type = "instance"
@@ -295,13 +295,13 @@ resource "aws_lb_target_group" "app" {
 }
 
 resource "aws_lb_listener" "app" {
-  count             = local.enable_full ? 1 : 0
-  load_balancer_arn = aws_lb.app[0].arn
+  count             = local.enable_full ? var.alb_count : 0
+  load_balancer_arn = aws_lb.app[count.index].arn
   port              = 80
   protocol          = "HTTP"
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app[0].arn
+    target_group_arn = aws_lb_target_group.app[count.index].arn
   }
 }
 
@@ -313,15 +313,15 @@ resource "aws_acm_certificate" "app" {
 }
 
 resource "aws_lb_listener" "app_https" {
-  count             = local.enable_full ? 1 : 0
-  load_balancer_arn = aws_lb.app[0].arn
+  count             = local.enable_full ? var.alb_count : 0
+  load_balancer_arn = aws_lb.app[count.index].arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
   certificate_arn   = aws_acm_certificate.app[0].arn
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app[0].arn
+    target_group_arn = aws_lb_target_group.app[count.index].arn
   }
 }
 
@@ -359,7 +359,7 @@ resource "aws_autoscaling_group" "app" {
   desired_capacity    = var.asg_desired_capacity
   vpc_zone_identifier = [for subnet in aws_subnet.private : subnet.id]
   health_check_type   = "EC2"
-  target_group_arns   = [aws_lb_target_group.app[0].arn]
+  target_group_arns   = [for tg in aws_lb_target_group.app : tg.arn]
 
   launch_template {
     id      = aws_launch_template.app[0].id
@@ -416,15 +416,19 @@ resource "aws_route53_zone" "app" {
 }
 
 resource "aws_route53_record" "app" {
-  count   = local.enable_full ? 1 : 0
+  count   = local.enable_full ? var.alb_count : 0
   zone_id = aws_route53_zone.app[0].zone_id
   name    = "app.${var.component}.local"
   type    = "CNAME"
   ttl     = 60
-  records = [aws_lb.app[0].dns_name]
+  records = [aws_lb.app[count.index].dns_name]
+  set_identifier = "alb-${count.index + 1}"
+  weighted_routing_policy {
+    weight = 1
+  }
 }
 
 locals {
-  alb_dns     = local.enable_full ? aws_lb.app[0].dns_name : "simulated-alb"
+  alb_dns     = local.enable_full ? [for lb in aws_lb.app : lb.dns_name] : ["simulated-alb"]
   rds_endpoint = local.enable_full ? aws_db_instance.app[0].endpoint : "simulated-rds"
 }

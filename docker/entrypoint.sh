@@ -6,7 +6,7 @@ export PATH=/usr/bin:/bin:/opt/allowed-bin
 
 if [ -d /workspace ]; then
   rm -rf /workspace/ansible /workspace/terraform /workspace/pulumi /workspace/Makefile /workspace/README.md
-  cp -a /opt/seed/workspace/. /workspace/
+  cp -R /opt/seed/workspace/. /workspace/
   touch /workspace/.seeded
 fi
 
@@ -30,10 +30,19 @@ if [ -f /opt/terraform-cache/terraform.zip ] && [ ! -x /workspace/.terraform-bin
   chmod +x /workspace/.terraform-bin/terraform
 fi
 
-if [ -f /opt/pulumi-cache/pulumi.tgz ] && [ ! -x /workspace/.pulumi-cli/pulumi ]; then
+pulumi_version=""
+if [ -f /opt/pulumi-cache/pulumi.version ]; then
+  pulumi_version="$(cat /opt/pulumi-cache/pulumi.version)"
+fi
+workspace_pulumi_version=""
+if [ -f /workspace/.pulumi-cli/.version ]; then
+  workspace_pulumi_version="$(cat /workspace/.pulumi-cli/.version)"
+fi
+if [ -f /opt/pulumi-cache/pulumi.tgz ] && [ "${pulumi_version}" != "${workspace_pulumi_version}" ]; then
   rm -rf /workspace/.pulumi-cli
   mkdir -p /workspace/.pulumi-cli
   tar -xzf /opt/pulumi-cache/pulumi.tgz -C /workspace/.pulumi-cli --strip-components=1
+  printf '%s' "${pulumi_version}" > /workspace/.pulumi-cli/.version
 fi
 
 if [ -f /opt/pulumi-plugins-cache/aws.tgz ]; then

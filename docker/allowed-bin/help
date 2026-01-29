@@ -10,10 +10,12 @@ Allowed commands:
   ansible
   ansible-playbook
   ansible-run
+  ansible-destroy
   pulumi
   pulumi-python
   vim
   make
+  clear
   mkdir
   rm
   chmod
@@ -25,7 +27,7 @@ Allowed commands:
   id
 
 Notes:
-- Login shell allows `cd` so you can move into `terraform/`, `ansible/`, and `pulumi/python`.
+- Login shell allows `cd` within `/workspace` so you can move into `terraform/`, `ansible/`, and `pulumi/python`.
 - Terraform and Pulumi providers are bundled for offline use.
 - Use `vim` to edit files inside `/workspace`.
 MSG

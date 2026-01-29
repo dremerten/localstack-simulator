@@ -9,6 +9,12 @@ simulate = config.get_bool("simulateUnsupported")
 if simulate is None:
     simulate = True
 
+alb_count = config.get_int("albCount") or 3
+az_count = config.get_int("azCount") or 3
+asg_min_size = config.get_int("asgMinSize") or 3
+asg_max_size = config.get_int("asgMaxSize") or 6
+asg_desired_capacity = config.get_int("asgDesiredCapacity") or 3
+
 def is_localstack_pro() -> bool:
     if (os.getenv("LOCALSTACK_PRO", "") or "").lower() in ("1", "true", "yes"):
         return True
@@ -57,11 +63,14 @@ def provider_for(region: str):
     if endpoint_kwargs:
         endpoints = [aws.ProviderEndpointArgs(**endpoint_kwargs)]
 
+    access_key = os.getenv("AWS_ACCESS_KEY_ID", "test")
+    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "test")
+
     provider = aws.Provider(
         f"localstack-{region}",
         region=region,
-        access_key="82238efb-be7a-4652-a992-a596949d5e30",
-        secret_key="d4ffcdc9-084f-4bc8-88f3-09e80fb0c5ac",
+        access_key=access_key,
+        secret_key=secret_key,
         skip_credentials_validation=True,
         skip_metadata_api_check=True,
         skip_requesting_account_id=True,
@@ -114,13 +123,14 @@ def build_region(prefix: str, region: str, cidr: str):
 
     octets = cidr.split(".")
     base = f"{octets[0]}.{octets[1]}"
-    public_cidrs = [f"{base}.0.0/24", f"{base}.1.0/24"]
-    private_cidrs = [f"{base}.10.0/24", f"{base}.11.0/24"]
-    azs = [f"{region}a", f"{region}b"]
+    az_letters = ["a", "b", "c", "d", "e", "f"]
+    azs = [f"{region}{az_letters[i]}" for i in range(az_count)]
+    public_cidrs = [f"{base}.{i}.0/24" for i in range(az_count)]
+    private_cidrs = [f"{base}.{10 + i}.0/24" for i in range(az_count)]
 
     public_subnets = []
     private_subnets = []
-    for i in range(2):
+    for i in range(az_count):
         public_subnets.append(
             aws.ec2.Subnet(
                 f"{prefix}-public-{i+1}",
@@ -165,37 +175,40 @@ def build_region(prefix: str, region: str, cidr: str):
             opts=opts,
         )
 
-    private_rt = aws.ec2.RouteTable(
-        f"{prefix}-private-rt",
-        vpc_id=vpc.id,
-        tags={**tags, "tier": "private"},
-        opts=opts,
-    )
-
-    nat_gateway = None
+    nat_gateways = []
     if not simulate:
-        eip = aws.ec2.Eip(
-            f"{prefix}-nat-eip",
-            domain="vpc",
-            tags=tags,
-            opts=opts,
-        )
-        nat_gateway = aws.ec2.NatGateway(
-            f"{prefix}-nat",
-            allocation_id=eip.id,
-            subnet_id=public_subnets[0].id,
-            tags=tags,
-            opts=opts,
-        )
-        aws.ec2.Route(
-            f"{prefix}-private-nat",
-            route_table_id=private_rt.id,
-            destination_cidr_block="0.0.0.0/0",
-            nat_gateway_id=nat_gateway.id,
-            opts=opts,
-        )
+        for idx, subnet in enumerate(public_subnets, start=1):
+            eip = aws.ec2.Eip(
+                f"{prefix}-nat-eip-{idx}",
+                domain="vpc",
+                tags=tags,
+                opts=opts,
+            )
+            nat_gateways.append(
+                aws.ec2.NatGateway(
+                    f"{prefix}-nat-{idx}",
+                    allocation_id=eip.id,
+                    subnet_id=subnet.id,
+                    tags=tags,
+                    opts=opts,
+                )
+            )
 
     for idx, subnet in enumerate(private_subnets, start=1):
+        private_rt = aws.ec2.RouteTable(
+            f"{prefix}-private-rt-{idx}",
+            vpc_id=vpc.id,
+            tags={**tags, "tier": "private"},
+            opts=opts,
+        )
+        if not simulate:
+            aws.ec2.Route(
+                f"{prefix}-private-nat-{idx}",
+                route_table_id=private_rt.id,
+                destination_cidr_block="0.0.0.0/0",
+                nat_gateway_id=nat_gateways[idx - 1].id,
+                opts=opts,
+            )
         aws.ec2.RouteTableAssociation(
             f"{prefix}-private-assoc-{idx}",
             subnet_id=subnet.id,
@@ -209,10 +222,10 @@ def build_region(prefix: str, region: str, cidr: str):
         tags=tags,
         opts=opts,
     )
-    aws.s3.BucketVersioningV2(
+    aws.s3.BucketVersioning(
         f"{prefix}-bucket-versioning",
         bucket=bucket.id,
-        versioning_configuration=aws.s3.BucketVersioningV2VersioningConfigurationArgs(
+        versioning_configuration=aws.s3.BucketVersioningVersioningConfigurationArgs(
             status="Enabled"
         ),
         opts=opts,
@@ -226,12 +239,12 @@ def build_region(prefix: str, region: str, cidr: str):
         restrict_public_buckets=True,
         opts=opts,
     )
-    aws.s3.BucketServerSideEncryptionConfigurationV2(
+    aws.s3.BucketServerSideEncryptionConfiguration(
         f"{prefix}-bucket-sse",
         bucket=bucket.id,
         rules=[
-            aws.s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
-                apply_server_side_encryption_by_default=aws.s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
+            aws.s3.BucketServerSideEncryptionConfigurationRuleArgs(
+                apply_server_side_encryption_by_default=aws.s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                     sse_algorithm="AES256"
                 )
             )
@@ -379,7 +392,9 @@ def build_region(prefix: str, region: str, cidr: str):
     can_rds = supported.get("rds", False)
     can_route53 = supported.get("route53", False)
 
-    alb_dns = pulumi.Output.from_input("simulated-alb")
+    alb_dns = []
+    albs = []
+    tgs = []
     if not simulate and can_elb and can_asg:
         cert = aws.acm.Certificate(
             f"{prefix}-alb-cert",
@@ -389,59 +404,63 @@ def build_region(prefix: str, region: str, cidr: str):
             opts=opts,
         )
 
-        alb = aws.lb.LoadBalancer(
-            f"{prefix}-alb",
-            load_balancer_type="application",
-            internal=False,
-            security_groups=[alb_sg.id],
-            subnets=[s.id for s in public_subnets],
-            tags=tags,
-            opts=opts,
-        )
+        for idx in range(alb_count):
+            alb = aws.lb.LoadBalancer(
+                f"{prefix}-alb-{idx + 1}",
+                load_balancer_type="application",
+                internal=False,
+                security_groups=[alb_sg.id],
+                subnets=[s.id for s in public_subnets],
+                tags=tags,
+                opts=opts,
+            )
 
-        tg = aws.lb.TargetGroup(
-            f"{prefix}-tg",
-            port=80,
-            protocol="HTTP",
-            target_type="instance",
-            vpc_id=vpc.id,
-            health_check=aws.lb.TargetGroupHealthCheckArgs(
-                path="/",
+            tg = aws.lb.TargetGroup(
+                f"{prefix}-tg-{idx + 1}",
+                port=80,
                 protocol="HTTP",
-            ),
-            tags=tags,
-            opts=opts,
-        )
+                target_type="instance",
+                vpc_id=vpc.id,
+                health_check=aws.lb.TargetGroupHealthCheckArgs(
+                    path="/",
+                    protocol="HTTP",
+                ),
+                tags=tags,
+                opts=opts,
+            )
 
-        aws.lb.Listener(
-            f"{prefix}-listener",
-            load_balancer_arn=alb.arn,
-            port=80,
-            protocol="HTTP",
-            default_actions=[
-                aws.lb.ListenerDefaultActionArgs(
-                    type="forward",
-                    target_group_arn=tg.arn,
-                )
-            ],
-            opts=opts,
-        )
+            aws.lb.Listener(
+                f"{prefix}-listener-{idx + 1}",
+                load_balancer_arn=alb.arn,
+                port=80,
+                protocol="HTTP",
+                default_actions=[
+                    aws.lb.ListenerDefaultActionArgs(
+                        type="forward",
+                        target_group_arn=tg.arn,
+                    )
+                ],
+                opts=opts,
+            )
 
-        aws.lb.Listener(
-            f"{prefix}-listener-https",
-            load_balancer_arn=alb.arn,
-            port=443,
-            protocol="HTTPS",
-            ssl_policy="ELBSecurityPolicy-2016-08",
-            certificate_arn=cert.arn,
-            default_actions=[
-                aws.lb.ListenerDefaultActionArgs(
-                    type="forward",
-                    target_group_arn=tg.arn,
-                )
-            ],
-            opts=opts,
-        )
+            aws.lb.Listener(
+                f"{prefix}-listener-https-{idx + 1}",
+                load_balancer_arn=alb.arn,
+                port=443,
+                protocol="HTTPS",
+                ssl_policy="ELBSecurityPolicy-2016-08",
+                certificate_arn=cert.arn,
+                default_actions=[
+                    aws.lb.ListenerDefaultActionArgs(
+                        type="forward",
+                        target_group_arn=tg.arn,
+                    )
+                ],
+                opts=opts,
+            )
+
+            albs.append(alb)
+            tgs.append(tg)
 
         user_data = """#!/bin/bash
 echo 'Hello from LocalStack' > /var/www/html/index.html
@@ -465,15 +484,15 @@ echo 'Hello from LocalStack' > /var/www/html/index.html
 
         aws.autoscaling.Group(
             f"{prefix}-asg",
-            desired_capacity=2,
-            max_size=4,
-            min_size=2,
+            desired_capacity=asg_desired_capacity,
+            max_size=asg_max_size,
+            min_size=asg_min_size,
             vpc_zone_identifiers=[s.id for s in private_subnets],
             launch_template=aws.autoscaling.GroupLaunchTemplateArgs(
                 id=lt.id,
                 version="$Latest",
             ),
-            target_group_arns=[tg.arn],
+            target_group_arns=[tg.arn for tg in tgs],
             health_check_type="EC2",
             tags=[
                 aws.autoscaling.GroupTagArgs(
@@ -485,18 +504,27 @@ echo 'Hello from LocalStack' > /var/www/html/index.html
             opts=opts,
         )
 
-        alb_dns = alb.dns_name
+        alb_dns = [alb.dns_name for alb in albs]
     else:
-        SimulatedResource(
-            f"{prefix}-alb",
-            {"dnsName": alb_dns},
-            opts=opts,
-        )
+        for idx in range(alb_count):
+            sim_dns = pulumi.Output.from_input(f"simulated-alb-{idx + 1}")
+            SimulatedResource(
+                f"{prefix}-alb-{idx + 1}",
+                {"dnsName": sim_dns},
+                opts=opts,
+            )
+            alb_dns.append(sim_dns)
 
     rds_endpoint = pulumi.Output.from_input("simulated-rds")
     if not simulate and can_rds:
-        db_username = config.get("dbUsername") or "appuser"
-        db_password = config.get_secret("dbPassword") or pulumi.Output.secret("localstack123")
+        db_username = config.get("dbUsername") or os.getenv("DB_USERNAME") or "appuser"
+        db_password = config.get_secret("dbPassword")
+        if db_password is None:
+            env_password = os.getenv("DB_PASSWORD")
+            if env_password:
+                db_password = pulumi.Output.secret(env_password)
+            else:
+                db_password = pulumi.Output.secret("localstack123")
 
         subnet_group = aws.rds.SubnetGroup(
             f"{prefix}-db-subnets",
@@ -539,16 +567,20 @@ echo 'Hello from LocalStack' > /var/www/html/index.html
             tags=tags,
             opts=opts,
         )
-
-        aws.route53.Record(
-            f"{prefix}-app-dns",
-            zone_id=zone.id,
-            name=f"app.{prefix}.local",
-            type="CNAME",
-            ttl=60,
-            records=[alb_dns],
-            opts=opts,
-        )
+        for idx, alb in enumerate(albs, start=1):
+            aws.route53.Record(
+                f"{prefix}-app-dns-{idx}",
+                zone_id=zone.id,
+                name=f"app.{prefix}.local",
+                type="CNAME",
+                ttl=60,
+                records=[alb.dns_name],
+                set_identifier=f"alb-{idx}",
+                weighted_routing_policy=aws.route53.RecordWeightedRoutingPolicyArgs(
+                    weight=1
+                ),
+                opts=opts,
+            )
     else:
         SimulatedResource(
             f"{prefix}-dns",

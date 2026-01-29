@@ -1,0 +1,23 @@
+- name: Destroy LocalStack S3 practice resources
+  hosts: local
+  gather_facts: false
+  vars_files:
+    - group_vars/all.yml
+  tasks:
+    - name: Delete object (if present)
+      ansible.builtin.command: >-
+        aws --endpoint-url {{ endpoint }}
+        --region {{ region }}
+        s3api delete-object --bucket {{ bucket_name }} --key {{ object_key }}
+      register: delete_object
+      failed_when: delete_object.rc != 0 and 'NoSuchKey' not in delete_object.stderr
+      changed_when: delete_object.rc == 0
+
+    - name: Delete bucket (if present)
+      ansible.builtin.command: >-
+        aws --endpoint-url {{ endpoint }}
+        --region {{ region }}
+        s3api delete-bucket --bucket {{ bucket_name }}
+      register: delete_bucket
+      failed_when: delete_bucket.rc != 0 and 'NoSuchBucket' not in delete_bucket.stderr
+      changed_when: delete_bucket.rc == 0

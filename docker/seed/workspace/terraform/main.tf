@@ -76,6 +76,7 @@ module "primary" {
   db_instance_class   = var.db_instance_class
   db_username         = var.db_username
   db_password         = var.db_password
+  alb_count           = var.alb_count
   asg_min_size        = var.asg_min_size
   asg_max_size        = var.asg_max_size
   asg_desired_capacity = var.asg_desired_capacity
@@ -96,6 +97,7 @@ module "secondary" {
   db_instance_class   = var.db_instance_class
   db_username         = var.db_username
   db_password         = var.db_password
+  alb_count           = var.alb_count
   asg_min_size        = var.asg_min_size
   asg_max_size        = var.asg_max_size
   asg_desired_capacity = var.asg_desired_capacity

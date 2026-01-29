@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+
+exec /opt/allowed-bin/ansible-playbook /home/sandbox/workspace/ansible/destroy.yml "$@"

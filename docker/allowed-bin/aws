@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+export AWS_PAGER=""
+
 case " $* " in
   *" --endpoint-url "*)
     exec /workspace/.aws-cli-bin/aws "$@"
