@@ -1,4 +1,4 @@
 scripts/apply-staging.sh
-.custom_*
+.custom_secrets.txt
 scripts/build-push-staging.sh
 docs
