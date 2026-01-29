@@ -1,0 +1,345 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: localstack-sim-staging
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sandbox-secrets
+  namespace: localstack-sim-staging
+type: Opaque
+stringData:
+  aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+  aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+  db_username: ${DB_USERNAME}
+  db_password: ${DB_PASSWORD}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dockerhub-pull
+  namespace: localstack-sim-staging
+type: kubernetes.io/dockerconfigjson
+stringData:
+  .dockerconfigjson: |
+    ${DOCKER_CONFIG_JSON}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox-sa
+  namespace: localstack-sim-staging
+imagePullSecrets:
+  - name: dockerhub-pull
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: localstack-sim-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: localstack/localstack:4.12.0
+          imagePullPolicy: Always
+          env:
+            - name: SERVICES
+              value: s3,sts,iam,lambda,ec2,elb,elbv2,autoscaling,rds,route53
+            - name: DEBUG
+              value: "0"
+          ports:
+            - name: edge
+              containerPort: 4566
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: localstack-data
+              mountPath: /var/lib/localstack
+      volumes:
+        - name: localstack-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: localstack-sim-staging
+spec:
+  selector:
+    app: localstack
+  ports:
+    - name: edge
+      port: 4566
+      targetPort: 4566
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox
+  namespace: localstack-sim-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sandbox
+  template:
+    metadata:
+      labels:
+        app: sandbox
+    spec:
+      serviceAccountName: sandbox-sa
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: sandbox
+          image: ${SANDBOX_IMAGE}
+          imagePullPolicy: Always
+          env:
+            - name: PORT
+              value: "5446"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: aws_access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: aws_secret_access_key
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: LOCALSTACK_ENDPOINT
+              value: http://localstack:4566
+            - name: AWS_EC2_METADATA_DISABLED
+              value: "true"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: db_username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: db_password
+            - name: TF_VAR_aws_access_key_id
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: aws_access_key_id
+            - name: TF_VAR_aws_secret_access_key
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: aws_secret_access_key
+            - name: TF_VAR_db_username
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: db_username
+            - name: TF_VAR_db_password
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: db_password
+          ports:
+            - name: http
+              containerPort: 5446
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            tcpSocket:
+              port: 5446
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5446
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
+            - name: var-tmp
+              mountPath: /var/tmp
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+        - name: var-tmp
+          emptyDir: {}
+        - name: shm
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox
+  namespace: localstack-sim-staging
+spec:
+  selector:
+    app: sandbox
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5446
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack-sim-gw-external
+  namespace: localstack-sim-staging
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: nginx-gateway
+    app.kubernetes.io/managed-by: nginx-gateway-nginx
+    app.kubernetes.io/name: localstack-sim-gw-nginx
+    gateway.networking.k8s.io/gateway-name: localstack-sim-gw
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: localstack-sim-gw
+  namespace: localstack-sim-staging
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - name: http
+      hostname: ${APP_DOMAIN}
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      hostname: ${APP_DOMAIN}
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: local-sim-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: localstack-sim-http
+  namespace: localstack-sim-staging
+spec:
+  parentRefs:
+    - name: localstack-sim-gw
+      sectionName: http
+  hostnames:
+    - ${APP_DOMAIN}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: localstack-sim-https
+  namespace: localstack-sim-staging
+spec:
+  parentRefs:
+    - name: localstack-sim-gw
+      sectionName: https
+  hostnames:
+    - ${APP_DOMAIN}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: sandbox
+          port: 80
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ${ACME_ISSUER_NAME}
+spec:
+  acme:
+    email: ${ACME_EMAIL}
+    server: ${ACME_SERVER}
+    privateKeySecretRef:
+      name: ${ACME_ACCOUNT_SECRET}
+    solvers:
+      - http01:
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: localstack-sim-gw
+                namespace: localstack-sim-staging
+                kind: Gateway
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: local-sim-tls
+  namespace: localstack-sim-staging
+spec:
+  secretName: local-sim-tls
+  issuerRef:
+    name: ${ACME_ISSUER_NAME}
+    kind: ClusterIssuer
+  dnsNames:
+    - ${APP_DOMAIN}
+  privateKey:
+    rotationPolicy: Never

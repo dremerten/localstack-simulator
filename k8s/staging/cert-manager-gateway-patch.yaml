@@ -1,0 +1,35 @@
+[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/volumes",
+    "value": []
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/volumes/-",
+    "value": {
+      "name": "cm-controller-config",
+      "configMap": {
+        "name": "cert-manager-controller-config"
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/volumeMounts",
+    "value": []
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/volumeMounts/-",
+    "value": {
+      "name": "cm-controller-config",
+      "mountPath": "/etc/cert-manager/config"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/args/-",
+    "value": "--config=/etc/cert-manager/config/config.yaml"
+  }
+]
