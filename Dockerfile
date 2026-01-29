@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 ARG DEBIAN_VERSION=bookworm-slim
 ARG PYTHON_VERSION=3.14.2
-ARG PULUMI_VERSION=3.216.0
+ARG PULUMI_VERSION=3.217.1
 ARG PULUMI_AWS_VERSION=7.16.0
 
 FROM debian:${DEBIAN_VERSION} AS fetch
@@ -64,9 +64,11 @@ RUN set -eu; \
   curl -fsSLo /tmp/pulumi.tgz "https://get.pulumi.com/releases/sdk/pulumi-v${PULUMI_VERSION}-linux-${pulumi_arch}.tar.gz"; \
   mkdir -p /tmp/pulumi-dist /opt/pulumi-cache /opt/pulumi-plugins-cache; \
   tar -C /tmp/pulumi-dist -xzf /tmp/pulumi.tgz; \
-  find /tmp/pulumi-dist/pulumi -maxdepth 1 -type f -name 'pulumi-language-*' ! -name 'pulumi-language-python' -delete; \
+  find /tmp/pulumi-dist/pulumi -maxdepth 1 -type f -name 'pulumi-language-*' ! -name 'pulumi-language-python' ! -name 'pulumi-language-python-exec' -delete; \
   strip /tmp/pulumi-dist/pulumi/pulumi /tmp/pulumi-dist/pulumi/pulumi-language-python; \
+  strip /tmp/pulumi-dist/pulumi/pulumi-language-python-exec || true; \
   tar -C /tmp/pulumi-dist -czf /opt/pulumi-cache/pulumi.tgz pulumi; \
+  printf '%s\n' "${PULUMI_VERSION}" > /opt/pulumi-cache/pulumi.version; \
   PULUMI_HOME=/tmp/pulumi-home /tmp/pulumi-dist/pulumi/pulumi plugin install resource aws "${PULUMI_AWS_VERSION}"; \
   if [ -d /tmp/pulumi-home/plugins ]; then \
     for f in /tmp/pulumi-home/plugins/*/pulumi-resource-*; do strip "$f" || true; done; \
@@ -105,10 +107,26 @@ ENV PATH=/opt/allowed-bin \
 
 RUN printf '%s\n' 'export PATH=/opt/allowed-bin' 'readonly PATH' 'umask 077' > /etc/profile.d/sandbox-path.sh
 RUN printf '%s\n' \
+  'cd() {' \
+  '  local target="${1:-$HOME}"' \
+  '  local target_path resolved' \
+  '  if [ "$target" = "-" ]; then target="${OLDPWD:-$PWD}"; fi' \
+  '  if [ "${target#/}" != "$target" ]; then' \
+  '    target_path="$target"' \
+  '  else' \
+  '    target_path="$PWD/$target"' \
+  '  fi' \
+  '  resolved="$(command cd -- "$target_path" 2>/dev/null && pwd -P)" || { echo "cd: $target: No such file or directory" >&2; return 1; }' \
+  '  case "$resolved" in' \
+  '    /workspace|/workspace/*|/home/sandbox|/home/sandbox/*) builtin cd "$resolved" ;;' \
+  '    *) echo "cd: access denied" >&2; return 1 ;;' \
+  '  esac' \
+  '}' > /etc/profile.d/sandbox-cd.sh
+RUN printf '%s\n' \
   'case "$-" in *i*) ;; *) return 0 ;; esac' \
   'if [ -d /workspace ] && [ -d /opt/seed/workspace ]; then' \
   '  /bin/rm -rf /workspace/ansible /workspace/terraform /workspace/pulumi /workspace/Makefile /workspace/README.md' \
-  '  /bin/cp -a /opt/seed/workspace/. /workspace/' \
+  '  /bin/cp -R /opt/seed/workspace/. /workspace/' \
   'fi' > /etc/profile.d/sandbox-reset.sh
 RUN printf '%s\n' \
   'provider_installation {' \

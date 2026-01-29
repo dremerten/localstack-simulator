@@ -1,39 +1,22 @@
-# Local Cloud Sandbox (LocalStack + Terraform + Ansible + Pulumi)
+# Local Cloud Sandbox
 
-A hostile-by-default, browser-based Linux sandbox for practicing AWS workflows using LocalStack. This project demonstrates platform engineering fundamentals: security hardening, isolation, repeatable automation, IAM best practices, and developer enablement.
+Project Created By Andre Merten, 2026
 
-## Highlights
-- Non-root sandbox with read-only root FS
-- No Docker socket, no capabilities, no privilege escalation
-- Internal-only network (egress blocked by default)
-- Resource limits for abuse prevention
-- Pre-seeded Terraform, Pulumi, and Ansible examples
-- HA, multi-region reference stacks with security guardrails
+This environment is a safe, isolated practice lab for cloud and infrastructure workflows. It also demonstrates my knowledge of Infrastructure as Code, security best practices in cloud and system design, and high availability. It gives you a real Linux terminal in the browser and a LocalStack-backed AWS API so you can experiment without touching real AWS or exposing the host.
 
-## What's Included
-- Terraform HA stack: two-region VPCs, public/private subnets, IGWs, NAT gateways, ALB + Auto Scaling, RDS (multi-AZ), Route 53 private DNS, S3 with security guardrails
-- Ansible role: create bucket + upload object against LocalStack
-- Pulumi project (Python): matching HA stack with simulated and full modes
-- Runbooks, architecture docs, and security model
+What this sandbox is for
+- Practice Infrastructure as Code and configuration management using Terraform, Pulumi (Python), and Ansible.
+- Learn how a highly available AWS-style architecture is composed (multi-region networking, compute, load balancing, storage, and databases).
+- Explore security best practices such as private subnets, encryption, and least-privilege IAM.
 
-## Docs
-- `docs/architecture.md`
-- `docs/security.md`
-- `docs/runbook.md`
-- `docs/diagram.mmd`
-- `docs/iac-explained.md`
+How it works (high level)
+- The sandbox is ephemeral. All work is confined to `/workspace` and resets on each new session.
+- LocalStack provides the AWS-compatible endpoints; nothing leaves the sandbox.
+- Reference code and examples live under `/workspace/terraform`, `/workspace/ansible`, and `/workspace/pulumi/python`.
 
-## Commands
+To see all available commands, run:
 ```
-make health
-make smoke
-make logs
-make clean
+make help
 ```
-
-## Skill Set Demonstrated
-- Container hardening & isolation
-- Network segmentation and egress control
-- Infrastructure as Code patterns (modules)
-- Configuration management (roles)
-- Operational tooling and runbooks
+- Workspace code resets to defaults on each new login (including page refresh).
+- `cd` is restricted to `/workspace` (and `/home/sandbox`) only.

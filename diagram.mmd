@@ -25,14 +25,14 @@ flowchart LR
 
   subgraph HA_Resources["HA Reference Resources - per region"]
     vpc[VPC]
-    pub[Public Subnets]
-    priv[Private Subnets]
+    pub["Public Subnets x3"]
+    priv["Private Subnets x3"]
     igw[Internet Gateway]
-    nat[NAT Gateways]
-    alb[ALB]
-    asg[Auto Scaling Group]
+    nat["NAT Gateways x3"]
+    albs["ALBs x3"]
+    asg["Auto Scaling Group (min 3)"]
     rds["RDS - Multi-AZ"]
-    r53["Route 53 Private DNS"]
+    r53["Route 53 Weighted DNS"]
     s3["S3 - SSE + Block Public"]
   end
 

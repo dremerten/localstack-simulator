@@ -1,1 +1,4 @@
+scripts/apply-staging.sh
+.custom_*
+scripts/build-push-staging.sh
 docs
