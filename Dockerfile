@@ -100,6 +100,7 @@ COPY --from=fetch /opt/pulumi-cache /opt/pulumi-cache
 COPY --from=fetch /opt/pulumi-plugins-cache /opt/pulumi-plugins-cache
 COPY --from=python-build /opt/venv /opt/venv
 COPY docker/allowed-bin/ /opt/allowed-bin/
+COPY docker/ui/ /opt/ui/
 
 ENV PATH=/opt/allowed-bin \
     PORT=5446 \

@@ -27,5 +27,5 @@ logs: ## tail logs
 health: ## run host healthcheck
 	./scripts/healthcheck.sh
 
-smoke: ## run sandbox awscli smoke test
+smoke: ## run iac-sandbox awscli smoke test
 	./scripts/smoke.sh
