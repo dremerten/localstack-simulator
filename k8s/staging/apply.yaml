@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: localstack-sim-staging
+  name: iac-sandbox-staging
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: sandbox-secrets
-  namespace: localstack-sim-staging
+  name: iac-sandbox-secrets
+  namespace: iac-sandbox-staging
 type: Opaque
 stringData:
   aws_access_key_id: ${AWS_ACCESS_KEY_ID}
@@ -19,7 +19,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: dockerhub-pull
-  namespace: localstack-sim-staging
+  namespace: iac-sandbox-staging
 type: kubernetes.io/dockerconfigjson
 stringData:
   .dockerconfigjson: |
@@ -28,8 +28,8 @@ stringData:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: sandbox-sa
-  namespace: localstack-sim-staging
+  name: iac-sandbox-sa
+  namespace: iac-sandbox-staging
 imagePullSecrets:
   - name: dockerhub-pull
 ---
@@ -37,7 +37,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: localstack
-  namespace: localstack-sim-staging
+  namespace: iac-sandbox-staging
 spec:
   replicas: 1
   selector:
@@ -54,7 +54,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: SERVICES
-              value: s3,sts,iam,lambda,ec2,elb,elbv2,autoscaling,rds,route53
+              value: s3,sts,iam,lambda,ec2,dynamodb,dynamodbstreams,es,opensearch,redshift,sqs,sns,events,scheduler,ses,stepfunctions,apigateway,route53,route53resolver,cloudformation,cloudwatch,logs,ssm,config
             - name: DEBUG
               value: "0"
           ports:
@@ -78,7 +78,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: localstack
-  namespace: localstack-sim-staging
+  namespace: iac-sandbox-staging
 spec:
   selector:
     app: localstack
@@ -90,26 +90,26 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sandbox
-  namespace: localstack-sim-staging
+  name: iac-sandbox
+  namespace: iac-sandbox-staging
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sandbox
+      app: iac-sandbox
   template:
     metadata:
       labels:
-        app: sandbox
+        app: iac-sandbox
     spec:
-      serviceAccountName: sandbox-sa
+      serviceAccountName: iac-sandbox-sa
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
       containers:
-        - name: sandbox
+        - name: iac-sandbox
           image: ${SANDBOX_IMAGE}
           imagePullPolicy: Always
           env:
@@ -118,12 +118,12 @@ spec:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: aws_access_key_id
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: aws_secret_access_key
             - name: AWS_DEFAULT_REGION
               value: us-east-1
@@ -134,32 +134,32 @@ spec:
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: db_username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: db_password
             - name: TF_VAR_aws_access_key_id
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: aws_access_key_id
             - name: TF_VAR_aws_secret_access_key
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: aws_secret_access_key
             - name: TF_VAR_db_username
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: db_username
             - name: TF_VAR_db_password
               valueFrom:
                 secretKeyRef:
-                  name: sandbox-secrets
+                  name: iac-sandbox-secrets
                   key: db_password
           ports:
             - name: http
@@ -212,11 +212,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sandbox
-  namespace: localstack-sim-staging
+  name: iac-sandbox
+  namespace: iac-sandbox-staging
 spec:
   selector:
-    app: sandbox
+    app: iac-sandbox
   ports:
     - name: http
       port: 80
@@ -225,15 +225,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: localstack-sim-gw-external
-  namespace: localstack-sim-staging
+  name: iac-sandbox-gw-external
+  namespace: iac-sandbox-staging
 spec:
   type: ClusterIP
   selector:
     app.kubernetes.io/instance: nginx-gateway
     app.kubernetes.io/managed-by: nginx-gateway-nginx
-    app.kubernetes.io/name: localstack-sim-gw-nginx
-    gateway.networking.k8s.io/gateway-name: localstack-sim-gw
+    app.kubernetes.io/name: iac-sandbox-gw-nginx
+    gateway.networking.k8s.io/gateway-name: iac-sandbox-gw
   ports:
     - name: http
       port: 80
@@ -245,8 +245,8 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: localstack-sim-gw
-  namespace: localstack-sim-staging
+  name: iac-sandbox-gw
+  namespace: iac-sandbox-staging
 spec:
   gatewayClassName: nginx
   listeners:
@@ -264,7 +264,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: local-sim-tls
+          - name: iac-sandbox-tls
       allowedRoutes:
         namespaces:
           from: All
@@ -272,11 +272,11 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: localstack-sim-http
-  namespace: localstack-sim-staging
+  name: iac-sandbox-http
+  namespace: iac-sandbox-staging
 spec:
   parentRefs:
-    - name: localstack-sim-gw
+    - name: iac-sandbox-gw
       sectionName: http
   hostnames:
     - ${APP_DOMAIN}
@@ -294,11 +294,11 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: localstack-sim-https
-  namespace: localstack-sim-staging
+  name: iac-sandbox-https
+  namespace: iac-sandbox-staging
 spec:
   parentRefs:
-    - name: localstack-sim-gw
+    - name: iac-sandbox-gw
       sectionName: https
   hostnames:
     - ${APP_DOMAIN}
@@ -308,7 +308,7 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: sandbox
+        - name: iac-sandbox
           port: 80
 ---
 apiVersion: cert-manager.io/v1
@@ -325,17 +325,17 @@ spec:
       - http01:
           gatewayHTTPRoute:
             parentRefs:
-              - name: localstack-sim-gw
-                namespace: localstack-sim-staging
+              - name: iac-sandbox-gw
+                namespace: iac-sandbox-staging
                 kind: Gateway
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: local-sim-tls
-  namespace: localstack-sim-staging
+  name: iac-sandbox-tls
+  namespace: iac-sandbox-staging
 spec:
-  secretName: local-sim-tls
+  secretName: iac-sandbox-tls
   issuerRef:
     name: ${ACME_ISSUER_NAME}
     kind: ClusterIssuer
