@@ -10,11 +10,11 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Running AWS CLI smoke test inside sandbox..."
-docker compose exec -T sandbox sh -lc '
+echo "Running AWS CLI smoke test inside iac-sandbox..."
+docker compose exec -T iac-sandbox /bin/bash -lc '
   aws --endpoint-url "$LOCALSTACK_ENDPOINT" sts get-caller-identity >/dev/null
   aws --endpoint-url "$LOCALSTACK_ENDPOINT" s3api list-buckets >/dev/null
-  echo "sandbox awscli: ok"
+  echo "iac-sandbox awscli: ok"
 '
 
 echo "OK"

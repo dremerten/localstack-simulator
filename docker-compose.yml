@@ -2,8 +2,10 @@ services:
   localstack:
     image: localstack/localstack:4.12.0
     environment:
-      - SERVICES=s3,sts,iam,lambda,ec2,elb,elbv2,autoscaling,rds,route53
+      - SERVICES=s3,sts,iam,lambda,ec2,dynamodb,dynamodbstreams,es,opensearch,redshift,sqs,sns,events,scheduler,ses,stepfunctions,apigateway,route53,route53resolver,cloudformation,cloudwatch,logs,ssm,config
       - DEBUG=0
+    extra_hosts:
+      - "localhost.localstack.cloud:127.0.0.1"
     ports:
       - "4566:4566"
     volumes:
@@ -11,7 +13,7 @@ services:
     networks:
       - sandbox-net
 
-  sandbox:
+  iac-sandbox:
     build:
       context: .
     depends_on:
@@ -38,17 +40,17 @@ services:
       - workspace:/workspace:rw
     mem_limit: 1g
     cpus: "1.0"
-    pids_limit: 128
+    pids_limit: 512
     init: true
     networks:
       - sandbox-net
 
-  gateway:
+  iac-sandbox-gateway:
     build:
       context: .
       dockerfile: docker/proxy/Dockerfile
     depends_on:
-      - sandbox
+      - iac-sandbox
     ports:
       - "0.0.0.0:5446:5446"
     read_only: true
