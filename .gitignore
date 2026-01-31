@@ -3,3 +3,4 @@ scripts/apply-staging.sh
 scripts/build-push-staging.sh
 docs
 k8s/staging/README*
+docker-compose.override.yaml
