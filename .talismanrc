@@ -29,6 +29,9 @@ fileignoreconfig:
 - filename: .github/workflows/ci-branch-staging.yml
   checksum: a3ad822db64139151803f6a6351f1e42ae5c3f23e31e51793bacb7df733a9099
   ignore_detectors: [filecontent, filename, filesize]
+- filename: .github/workflows/deploy-prod.yml
+  checksum: 63121b822a7cda36cf7be0ea262ce5b700a2a6610bd4e51736bfb38253b2d3d0
+  ignore_detectors: [filecontent, filename, filesize]
 - filename: .custom_secrets.txt.example
   checksum: fb3232765bfdf07538e30bc39c29a3f64fa6e85f227ddcf818b5cce6c749e34c
   ignore_detectors: [filecontent, filename, filesize]

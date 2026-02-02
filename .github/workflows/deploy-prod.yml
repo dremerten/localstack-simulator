@@ -42,7 +42,22 @@ jobs:
       - name: Deploy to production
         env:
           ACME_EMAIL: ${{ secrets.ACME_EMAIL }}
-          ACME_MODE: ${{ secrets.ACME_MODE }}
+          ACME_MODE: staging
+          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+          APP_NAMESPACE: ${{ secrets.APP_NAMESPACE || 'iac-sandbox-prod' }}
+          PUBLIC_IP: ${{ secrets.PUBLIC_IP }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_EMAIL: ${{ secrets.DOCKERHUB_EMAIL }}
+          GATEWAY_NAMESPACE: ${{ secrets.GATEWAY_NAMESPACE }}
+          GATEWAY_SERVICE: ${{ secrets.GATEWAY_SERVICE }}
+          SANDBOX_IMAGE: ${{ env.IMAGE_REPO }}:${{ github.event.inputs.image_tag || github.sha }}
+        run: ./scripts/apply-staging.sh
+
+      - name: Issue production certificate
+        env:
+          ACME_EMAIL: ${{ secrets.ACME_EMAIL }}
+          ACME_MODE: ${{ secrets.ACME_MODE || 'prod' }}
           APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
           APP_NAMESPACE: ${{ secrets.APP_NAMESPACE || 'iac-sandbox-prod' }}
           PUBLIC_IP: ${{ secrets.PUBLIC_IP }}
