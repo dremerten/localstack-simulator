@@ -24,13 +24,16 @@ fileignoreconfig:
   checksum: cc1e6f0b8e2c569f624bb4de50016f4826b183153274e8d059b8c1025396b72d
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .github/workflows/pr-main.yml
-  checksum: cbf61ad3057386bbea274a8182cee954647d5e4b85de4649fabf7ce62c339929
+  checksum: 4e16abe0149a8bd78da52477f1b42b8143a6d99e3eab185bb08e502c0767779e
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .github/workflows/ci-branch-staging.yml
-  checksum: ac00177e5974dc663b0a63430a1c1ef927eeec164d5b6720e3697139095133ba
+  checksum: 75490fdaa67a4932a057bafb8bbbc8728c0650ffa15c0287d455efca2c52a190
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .github/workflows/deploy-prod.yml
   checksum: 937cc99a2dad8c589754d20c43234be4c2f9d987f3f01fde508d815dfed24585
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: .github/workflows/rollback-prod.yml
+  checksum: 9f8b4c872ae9b167d9056f3021c7e382a03a8a74c9e6077f0d006275586e1d72
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .custom_secrets.txt.example
   checksum: fb3232765bfdf07538e30bc39c29a3f64fa6e85f227ddcf818b5cce6c749e34c

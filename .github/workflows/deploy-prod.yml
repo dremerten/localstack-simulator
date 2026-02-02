@@ -2,12 +2,12 @@ name: Deploy Production
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: "Image tag to deploy (defaults to the commit SHA)"
+      release_tag:
+        description: "Release tag to deploy (e.g. v1.2 or v1.2.3). Leave empty to use the git tag."
         required: false
 
 permissions:
@@ -22,6 +22,25 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set release and promote tags
+        run: |
+          release_tag="${{ github.event.inputs.release_tag || github.ref_name }}"
+          if [ -z "$release_tag" ]; then
+            echo "release_tag is required (either input or git tag ref)." >&2
+            exit 1
+          fi
+          if ! echo "$release_tag" | grep -Eq '^v[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo "release_tag must look like v1.2 or v1.2.3" >&2
+            exit 1
+          fi
+          git fetch --tags --force
+          commit="$(git rev-parse "${release_tag}^{commit}")"
+          tree_sha="$(git rev-parse "${commit}^{tree}")"
+          echo "RELEASE_TAG=${release_tag}" >> "$GITHUB_ENV"
+          echo "PROMOTE_TAG=src-${tree_sha}" >> "$GITHUB_ENV"
 
       - name: Ensure required secrets
         run: |
@@ -30,6 +49,25 @@ jobs:
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.30.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Verify tested image exists
+        run: |
+          if ! docker manifest inspect "${IMAGE_REPO}:${PROMOTE_TAG}" >/dev/null 2>&1; then
+            echo "Tested image ${IMAGE_REPO}:${PROMOTE_TAG} not found. Ensure branch/PR tests ran for this code." >&2
+            exit 1
+          fi
+
+      - name: Promote tested image to release tag
+        run: |
+          docker pull "${IMAGE_REPO}:${PROMOTE_TAG}"
+          docker tag "${IMAGE_REPO}:${PROMOTE_TAG}" "${IMAGE_REPO}:${RELEASE_TAG}"
+          docker push "${IMAGE_REPO}:${RELEASE_TAG}"
 
       - name: Write kubeconfig
         env:
@@ -51,7 +89,7 @@ jobs:
           DOCKERHUB_EMAIL: ${{ secrets.DOCKERHUB_EMAIL }}
           GATEWAY_NAMESPACE: ${{ secrets.GATEWAY_NAMESPACE }}
           GATEWAY_SERVICE: ${{ secrets.GATEWAY_SERVICE }}
-          SANDBOX_IMAGE: ${{ env.IMAGE_REPO }}:${{ github.event.inputs.image_tag || github.sha }}
+          SANDBOX_IMAGE: ${{ env.IMAGE_REPO }}:${{ env.RELEASE_TAG }}
         run: ./scripts/apply-staging.sh
 
       - name: Issue production certificate
@@ -66,5 +104,5 @@ jobs:
           DOCKERHUB_EMAIL: ${{ secrets.DOCKERHUB_EMAIL }}
           GATEWAY_NAMESPACE: ${{ secrets.GATEWAY_NAMESPACE }}
           GATEWAY_SERVICE: ${{ secrets.GATEWAY_SERVICE }}
-          SANDBOX_IMAGE: ${{ env.IMAGE_REPO }}:${{ github.event.inputs.image_tag || github.sha }}
+          SANDBOX_IMAGE: ${{ env.IMAGE_REPO }}:${{ env.RELEASE_TAG }}
         run: ./scripts/apply-staging.sh
