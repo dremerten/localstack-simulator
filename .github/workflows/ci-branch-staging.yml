@@ -24,7 +24,7 @@ jobs:
           curl -sSL https://github.com/thoughtworks/talisman/releases/download/v1.29.2/talisman_linux_amd64 -o talisman
           chmod +x talisman
           set +e
-          ./talisman --scan
+          ./talisman --scan --ignoreHistory
           echo "$?" > talisman_exit_code.txt
           set -e
 

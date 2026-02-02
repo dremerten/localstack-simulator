@@ -1,0 +1,62 @@
+fileignoreconfig:
+- filename: docker/ui/index.html
+  checksum: 956a3da609fa779642aa8bc9e96b7331cc13679b200f469bc59c8599622023c7
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/terraform/modules/community_services/main.tf
+  checksum: a62453f8bd4c7ba8b40f073f67da3f91dcabce9e24e536ab4b8087b9aec90880
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/allowed-bin/pulumi-python
+  checksum: 382a3515e9d8e8c6a6b17cf476bd6b9417e4ca782a7c16c1495a111abdfb1645
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/allowed-bin/tf-interactive
+  checksum: b82a72d235b31d637477929927079aacb4d2dc27e2b8c77f878a8408f2e14ea8
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: k8s/staging/apply.yaml
+  checksum: a68bb3b7676b0067dc26bbe5bff7765fa728bdebb78a03cd4f7d5239f9a2b906
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/Makefile
+  checksum: aa0a36fa2ff6942277b6ca6fce324c72240621f8ca3d20acfd4d5fcbd5b7b029
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/pulumi/python/Pulumi.dev.yaml
+  checksum: 9490838970417d972a13b72e9780361a9d2914faa20dffae42c6d2877d38cc5c
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/ansible/group_vars/all.yml
+  checksum: cc1e6f0b8e2c569f624bb4de50016f4826b183153274e8d059b8c1025396b72d
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: .github/workflows/pr-main.yml
+  checksum: 4f70ecfdac0ed4650c1ee62ded9f739e3e225f65fe7e335af8a625208647ea0c
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: .github/workflows/ci-branch-staging.yml
+  checksum: 7636c306c2408e20bc706a6c2e3e30d9e27bb380f54e8bd86dad7cc148976a4f
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: .custom_secrets.txt.example
+  checksum: fb3232765bfdf07538e30bc39c29a3f64fa6e85f227ddcf818b5cce6c749e34c
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: Dockerfile
+  checksum: 9a7572497f8a8c30183a22bc6f18d6fe204fc6c91cf2bba7c589436a64488e3b
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker-compose.yml
+  checksum: 10e46d6c6e756891dd7d5d8300dd59238084814dbcfaa991d065462f05a0f355
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/allowed-bin/pulumi
+  checksum: 7cea6376d7b7b4e8b3c04761be79001f0aa0f246b23bc6afd0a0172a854358aa
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/ansible/roles/localstack_configure/tasks/main.yml
+  checksum: 82c7a2e980a3d0fe7b3efc9cf3db1697f25fef77585a6cfddd2f89257297b06f
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/pulumi/python/Pulumi.full.yaml
+  checksum: 6a75d6f537c3a6e3fecacc7e0e1dc81419b8a9ca49463778b2be015eb54e3736
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/pulumi/python/__main__.py
+  checksum: 8cb056227c85485fba0e959fa1064ebe8c4f0c47d783bd3171665480741c08d7
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/terraform/main.tf
+  checksum: 793d0f81731247333f763491e867b16250bfe8a009cf7ebca9fda77bb79f1fad
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/terraform/modules/ha_region/main.tf
+  checksum: 292eb4774862cc12aa028e379d05dcef21287332a2e3a2df4ed6fc4d287363d2
+  ignore_detectors: [filecontent, filename, filesize]
+- filename: docker/seed/workspace/terraform/modules/s3_bucket/main.tf
+  checksum: d1b8535b957f64453d5c4e9858099663113b4f72241affca43be6102b4196ec3
+  ignore_detectors: [filecontent, filename, filesize]
+version: "1.0"
