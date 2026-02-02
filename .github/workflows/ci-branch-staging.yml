@@ -12,10 +12,25 @@ env:
   IMAGE_REPO: ${{ secrets.DOCKER_IMAGE_REPO }}
 
 jobs:
-  build_test_scan:
+  talisman_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Talisman scan
+        run: |
+          curl -sSL https://github.com/thoughtworks/talisman/releases/download/v1.29.2/talisman_linux_amd64 -o talisman
+          chmod +x talisman
+          ./talisman --scan
+
+  build_image:
+    needs: talisman_scan
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.tags.outputs.image_tag }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      branch_tag: ${{ steps.meta.outputs.branch_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,31 +39,44 @@ jobs:
       - name: Ensure required secrets
         run: |
           test -n "${IMAGE_REPO}" || { echo "DOCKER_IMAGE_REPO secret is required"; exit 1; }
-          test -n "${{ secrets.DOCKERHUB_USERNAME }}" || { echo "DOCKERHUB_USERNAME secret is required"; exit 1; }
-          test -n "${{ secrets.DOCKERHUB_TOKEN }}" || { echo "DOCKERHUB_TOKEN secret is required"; exit 1; }
-
-      - name: Talisman scan
-        run: |
-          curl -sSL https://github.com/thoughtworks/talisman/releases/download/v1.29.2/talisman_linux_amd64 -o talisman
-          chmod +x talisman
-          ./talisman --scan
 
       - name: Set image tags
-        id: tags
+        id: meta
         run: |
           echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "branch_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
           echo "BRANCH_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build image
         run: |
           docker build -t "${IMAGE_REPO}:${IMAGE_TAG}" -t "${IMAGE_REPO}:${BRANCH_TAG}" .
+
+      - name: Save image artifact
+        run: |
+          docker save "${IMAGE_REPO}:${IMAGE_TAG}" "${IMAGE_REPO}:${BRANCH_TAG}" | gzip -1 > image.tar.gz
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ github.sha }}
+          path: image.tar.gz
+          retention-days: 1
+
+  trivy_scan:
+    needs: build_image
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ needs.build_image.outputs.image_tag }}
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-${{ github.sha }}
+
+      - name: Load image
+        run: |
+          gunzip -c image.tar.gz | docker load
 
       - name: Trivy image scan (CRITICAL only)
         uses: aquasecurity/trivy-action@0.24.0
@@ -57,6 +85,21 @@ jobs:
           severity: CRITICAL
           exit-code: "1"
           ignore-unfixed: true
+
+  docker_tests:
+    needs: [trivy_scan, build_image]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ needs.build_image.outputs.image_tag }}
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-${{ github.sha }}
+
+      - name: Load image
+        run: |
+          gunzip -c image.tar.gz | docker load
 
       - name: Docker tests
         env:
@@ -85,13 +128,41 @@ jobs:
           curl -fsS http://127.0.0.1:4566/_localstack/health >/dev/null
           curl -fsS http://127.0.0.1:5446 >/dev/null
 
+  push_image:
+    needs: [docker_tests, build_image]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ needs.build_image.outputs.image_tag }}
+      BRANCH_TAG: ${{ needs.build_image.outputs.branch_tag }}
+    steps:
+      - name: Ensure required secrets
+        run: |
+          test -n "${IMAGE_REPO}" || { echo "DOCKER_IMAGE_REPO secret is required"; exit 1; }
+          test -n "${{ secrets.DOCKERHUB_USERNAME }}" || { echo "DOCKERHUB_USERNAME secret is required"; exit 1; }
+          test -n "${{ secrets.DOCKERHUB_TOKEN }}" || { echo "DOCKERHUB_TOKEN secret is required"; exit 1; }
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-${{ github.sha }}
+
+      - name: Load image
+        run: |
+          gunzip -c image.tar.gz | docker load
+
       - name: Push image
         run: |
           docker push "${IMAGE_REPO}:${IMAGE_TAG}"
           docker push "${IMAGE_REPO}:${BRANCH_TAG}"
 
   deploy_staging:
-    needs: build_test_scan
+    needs: [push_image, build_image]
     runs-on: ubuntu-latest
     environment: staging
     steps:
@@ -121,5 +192,5 @@ jobs:
           DOCKERHUB_EMAIL: ${{ secrets.DOCKERHUB_EMAIL }}
           GATEWAY_NAMESPACE: ${{ secrets.GATEWAY_NAMESPACE }}
           GATEWAY_SERVICE: ${{ secrets.GATEWAY_SERVICE }}
-          SANDBOX_IMAGE: ${{ env.IMAGE_REPO }}:${{ needs.build_test_scan.outputs.image_tag }}
+          SANDBOX_IMAGE: ${{ env.IMAGE_REPO }}:${{ needs.build_image.outputs.image_tag }}
         run: ./scripts/apply-staging.sh
