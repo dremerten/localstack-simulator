@@ -24,13 +24,13 @@ fileignoreconfig:
   checksum: cc1e6f0b8e2c569f624bb4de50016f4826b183153274e8d059b8c1025396b72d
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .github/workflows/pr-main.yml
-  checksum: 4e16abe0149a8bd78da52477f1b42b8143a6d99e3eab185bb08e502c0767779e
+  checksum: 5b82b2ccfd302c9d5b20916ea4c036774d6cf0b7f8aa4df19984cfce276776d4
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .github/workflows/ci-branch-staging.yml
-  checksum: 75490fdaa67a4932a057bafb8bbbc8728c0650ffa15c0287d455efca2c52a190
+  checksum: 4113bac62cd71d0891005fd65102dbc94b39c0295319ec07c19f01b5e702438a
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .github/workflows/deploy-prod.yml
-  checksum: 937cc99a2dad8c589754d20c43234be4c2f9d987f3f01fde508d815dfed24585
+  checksum: 713233025aaf263008d2a569b71679171f2589a50c4437f3a2fd348aed349b03
   ignore_detectors: [filecontent, filename, filesize]
 - filename: .github/workflows/rollback-prod.yml
   checksum: 9f8b4c872ae9b167d9056f3021c7e382a03a8a74c9e6077f0d006275586e1d72
