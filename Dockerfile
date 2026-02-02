@@ -89,7 +89,7 @@ RUN /opt/venv/bin/pip install --no-cache-dir --no-compile ansible-core==2.20.1 p
 
 FROM python:${PYTHON_VERSION}-slim
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates coreutils make tar unzip vim \
+  && apt-get install -y --no-install-recommends bash ca-certificates coreutils make tar unzip vim openssl libssl3t64 \
   && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man /usr/share/locale
 
 COPY --from=fetch /opt/terraform-cache /opt/terraform-cache

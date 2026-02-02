@@ -72,7 +72,7 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -t "${IMAGE_REPO}:${IMAGE_TAG}" -t "${IMAGE_REPO}:${BRANCH_TAG}" .
+          docker build --pull -t "${IMAGE_REPO}:${IMAGE_TAG}" -t "${IMAGE_REPO}:${BRANCH_TAG}" .
 
       - name: Save image artifact
         run: |
