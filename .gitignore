@@ -1,6 +1,4 @@
-scripts/apply-staging.sh
-.custom_secrets.txt
-scripts/build-push-staging.sh
+\.custom_secrets.txt
 docs
 k8s/staging/README*
 docker-compose.override.yaml
