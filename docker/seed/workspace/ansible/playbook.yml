@@ -25,8 +25,24 @@
         - ansible.builtin.meta: end_play
 
     - name: Parse Terraform outputs
-      ansible.builtin.set_fact:
-        tf_outputs: "{{ tf_output.stdout | from_json }}"
+      block:
+        - name: Normalize Terraform output JSON
+          ansible.builtin.set_fact:
+            tf_output_json: "{{ tf_output.stdout | default('') | trim }}"
+
+        - name: Terraform outputs missing
+          ansible.builtin.debug:
+            msg:
+              - "Terraform outputs not found or empty."
+              - "Run: make tf-interactive"
+              - "Then run: make ansible-run"
+          when: tf_output_json | length == 0
+
+        - ansible.builtin.meta: end_play
+          when: tf_output_json | length == 0
+
+        - ansible.builtin.set_fact:
+            tf_outputs: "{{ tf_output_json | from_json }}"
 
     - name: Gather time facts for run id
       ansible.builtin.setup:
