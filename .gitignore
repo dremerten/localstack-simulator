@@ -1,4 +1,4 @@
-\.custom_secrets.txt
+.custom_*
 docs
 k8s/staging/README*
 docker-compose.override.yaml
