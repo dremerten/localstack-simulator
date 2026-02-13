@@ -222,53 +222,6 @@ spec:
       port: 80
       targetPort: 5446
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: iac-sandbox-gw-external
-  namespace: ${APP_NAMESPACE}
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/instance: nginx-gateway
-    app.kubernetes.io/managed-by: nginx-gateway-nginx
-    app.kubernetes.io/name: iac-sandbox-gw-nginx
-    gateway.networking.k8s.io/gateway-name: iac-sandbox-gw
-  ports:
-    - name: http
-      port: 80
-      targetPort: 80
-    - name: https
-      port: 443
-      targetPort: 443
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: iac-sandbox-gw
-  namespace: ${APP_NAMESPACE}
-spec:
-  gatewayClassName: nginx
-  listeners:
-    - name: http
-      hostname: ${APP_DOMAIN}
-      port: 80
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-    - name: https
-      hostname: ${APP_DOMAIN}
-      port: 443
-      protocol: HTTPS
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - name: iac-sandbox-tls
-      allowedRoutes:
-        namespaces:
-          from: All
----
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -276,8 +229,9 @@ metadata:
   namespace: ${APP_NAMESPACE}
 spec:
   parentRefs:
-    - name: iac-sandbox-gw
-      sectionName: http
+    - name: global-gateway
+      namespace: nginx-gateway
+      sectionName: acme-http
   hostnames:
     - ${APP_DOMAIN}
   rules:
@@ -298,8 +252,9 @@ metadata:
   namespace: ${APP_NAMESPACE}
 spec:
   parentRefs:
-    - name: iac-sandbox-gw
-      sectionName: https
+    - name: global-gateway
+      namespace: nginx-gateway
+      sectionName: iac-sandbox-staging
   hostnames:
     - ${APP_DOMAIN}
   rules:
@@ -312,34 +267,14 @@ spec:
           port: 80
 ---
 apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: ${ACME_ISSUER_NAME}
-spec:
-  acme:
-    email: ${ACME_EMAIL}
-    server: ${ACME_SERVER}
-    privateKeySecretRef:
-      name: ${ACME_ACCOUNT_SECRET}
-    solvers:
-      - http01:
-          gatewayHTTPRoute:
-            parentRefs:
-              - name: iac-sandbox-gw
-                namespace: ${APP_NAMESPACE}
-                kind: Gateway
----
-apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: iac-sandbox-tls
-  namespace: ${APP_NAMESPACE}
+  name: iac-sandbox-staging-cert
+  namespace: nginx-gateway
 spec:
-  secretName: iac-sandbox-tls
+  secretName: iac-sandbox-staging-tls
   issuerRef:
-    name: ${ACME_ISSUER_NAME}
+    name: letsencrypt-gateway
     kind: ClusterIssuer
   dnsNames:
     - ${APP_DOMAIN}
-  privateKey:
-    rotationPolicy: Never
